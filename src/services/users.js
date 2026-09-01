@@ -11,20 +11,54 @@ import { db } from "../firebase";
 export async function searchUsers(searchText) {
   const value = searchText.trim().toLowerCase();
 
-  if (!value) return [];
+  if (!value) {
+    return [];
+  }
 
-  const q = query(
-    collection(db, "users"),
+  const usersRef = collection(db, "users");
+
+  // Search by email
+  const emailQuery = query(
+    usersRef,
     where("email", "==", value),
     limit(10)
   );
 
-  const snapshot = await getDocs(q);
+  // Search by name
+  const nameQuery = query(
+    usersRef,
+    where("nameLower", "==", value),
+    limit(10)
+  );
 
-  return snapshot.docs
-    .map((doc) => ({
+  const [emailSnapshot, nameSnapshot] =
+    await Promise.all([
+      getDocs(emailQuery),
+      getDocs(nameQuery)
+    ]);
+
+  const users = [];
+
+  emailSnapshot.forEach((doc) => {
+    users.push({
       id: doc.id,
       ...doc.data()
-    }))
-    .filter((user) => user.uid !== undefined);
+    });
+  });
+
+  nameSnapshot.forEach((doc) => {
+    const data = {
+      id: doc.id,
+      ...doc.data()
+    };
+
+    // Duplicate නොවෙන්න
+    if (!users.some((user) => user.uid === data.uid)) {
+      users.push(data);
+    }
+  });
+
+  return users
+    .filter((user) => user.uid)
+    .slice(0, 10);
 }
