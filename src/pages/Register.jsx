@@ -22,14 +22,44 @@ import {
 } from "lucide-react";
 
 
+function generateSRId() {
+
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  let id = "SR-";
+
+  for (let i = 0; i < 6; i++) {
+
+    id +=
+      chars[
+        Math.floor(
+          Math.random() * chars.length
+        )
+      ];
+
+  }
+
+  return id;
+}
+
+
 function Register({ onLogin }) {
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [name, setName] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
 
   const register = async (e) => {
@@ -81,9 +111,7 @@ function Register({ onLogin }) {
       setLoading(true);
 
 
-      /*
-       * 1. Create Firebase Authentication user
-       */
+      /* Create Firebase account */
 
       const result =
         await createUserWithEmailAndPassword(
@@ -93,21 +121,24 @@ function Register({ onLogin }) {
         );
 
 
-      /*
-       * 2. Set Firebase display name
-       */
+      /* Generate SR ID */
+
+      const srId =
+        generateSRId();
+
+
+      /* Set display name */
 
       await updateProfile(
         result.user,
         {
-          displayName: cleanName
+          displayName:
+            cleanName
         }
       );
 
 
-      /*
-       * 3. Create Firestore user document
-       */
+      /* Save user */
 
       await setDoc(
         doc(
@@ -116,18 +147,23 @@ function Register({ onLogin }) {
           result.user.uid
         ),
         {
-          uid: result.user.uid,
+          uid:
+            result.user.uid,
 
-          name: cleanName,
+          name:
+            cleanName,
 
-          nameLower:
-            cleanName.toLowerCase(),
+          email:
+            cleanEmail,
 
-          email: cleanEmail,
+          srId:
+            srId,
 
-          photoURL: "",
+          photoURL:
+            "",
 
-          status: "online",
+          status:
+            "online",
 
           createdAt:
             serverTimestamp()
@@ -136,20 +172,14 @@ function Register({ onLogin }) {
 
 
       console.log(
-        "USER DOCUMENT CREATED:",
-        result.user.uid
+        "SR ID:",
+        srId
       );
 
-
-      /*
-       * Authentication state automatically
-       * takes the user to ChatApp.
-       */
 
     } catch (err) {
 
       console.error(
-        "REGISTER ERROR:",
         err
       );
 
@@ -169,7 +199,7 @@ function Register({ onLogin }) {
       ) {
 
         setError(
-          "Please enter a valid email."
+          "Invalid email address."
         );
 
       } else if (
@@ -178,7 +208,7 @@ function Register({ onLogin }) {
       ) {
 
         setError(
-          "Password is too weak."
+          "Password must contain at least 6 characters."
         );
 
       } else if (
@@ -233,7 +263,11 @@ function Register({ onLogin }) {
         </div>
 
 
-        <form onSubmit={register}>
+        <form
+          onSubmit={
+            register
+          }
+        >
 
 
           {/* NAME */}
@@ -246,14 +280,18 @@ function Register({ onLogin }) {
 
             <div className="auth-input">
 
-              <User size={18} />
+              <User
+                size={18}
+              />
 
               <input
                 type="text"
                 placeholder="Your name"
                 value={name}
                 onChange={(e) =>
-                  setName(e.target.value)
+                  setName(
+                    e.target.value
+                  )
                 }
                 autoComplete="name"
               />
@@ -273,14 +311,18 @@ function Register({ onLogin }) {
 
             <div className="auth-input">
 
-              <Mail size={18} />
+              <Mail
+                size={18}
+              />
 
               <input
                 type="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) =>
-                  setEmail(e.target.value)
+                  setEmail(
+                    e.target.value
+                  )
                 }
                 autoComplete="email"
               />
@@ -300,14 +342,18 @@ function Register({ onLogin }) {
 
             <div className="auth-input">
 
-              <Lock size={18} />
+              <Lock
+                size={18}
+              />
 
               <input
                 type="password"
                 placeholder="Minimum 6 characters"
                 value={password}
                 onChange={(e) =>
-                  setPassword(e.target.value)
+                  setPassword(
+                    e.target.value
+                  )
                 }
                 autoComplete="new-password"
               />
@@ -330,7 +376,7 @@ function Register({ onLogin }) {
           )}
 
 
-          {/* SUBMIT */}
+          {/* BUTTON */}
 
           <button
             className="auth-submit"
@@ -342,19 +388,23 @@ function Register({ onLogin }) {
 
               <>
                 <Loader2
-                  className="spin"
                   size={18}
+                  className="spin"
                 />
 
                 Creating...
+
               </>
 
             ) : (
 
               <>
-                <UserPlus size={18} />
+                <UserPlus
+                  size={18}
+                />
 
                 Create account
+
               </>
 
             )}
@@ -371,7 +421,9 @@ function Register({ onLogin }) {
 
           <button
             type="button"
-            onClick={onLogin}
+            onClick={
+              onLogin
+            }
           >
             Sign in
           </button>
