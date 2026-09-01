@@ -7,14 +7,14 @@ import {
 
 import {
   collection,
-  query,
-  where,
-  getDocs,
   addDoc,
+  onSnapshot,
   serverTimestamp
 } from "firebase/firestore";
 
 import { auth, db } from "./firebase";
+
+import { searchUsers } from "./services/users";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -39,45 +39,55 @@ import {
 } from "lucide-react";
 
 
-function ChatApp({ user }) {
+/* ================================
+   CHAT APP
+================================ */
 
-  const [message, setMessage] = useState("");
+function ChatApp({ user }) {
 
   const [search, setSearch] = useState("");
 
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] =
+    useState([]);
 
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] =
+    useState(false);
 
-  const [searchError, setSearchError] = useState("");
+  const [searchError, setSearchError] =
+    useState("");
 
-  const [activeChat, setActiveChat] = useState(null);
+  const [contacts, setContacts] =
+    useState([]);
 
-  const [contacts, setContacts] = useState([]);
+  const [activeChat, setActiveChat] =
+    useState(null);
+
+  const [message, setMessage] =
+    useState("");
 
 
-  /*
-   * SEARCH USERS BY EMAIL
-   */
+  /* ================================
+     SEARCH USERS
+  ================================= */
 
   useEffect(() => {
 
-    const searchPeople = async () => {
+    const timer = setTimeout(async () => {
 
-      const email = search.trim().toLowerCase();
+      const value =
+        search.trim().toLowerCase();
 
       setSearchError("");
       setSearchResults([]);
 
-      if (!email) {
+      if (!value) {
         return;
       }
 
-      /*
-       * Don't search yourself
-       */
-
-      if (email === user.email?.toLowerCase()) {
+      if (
+        value ===
+        user.email?.toLowerCase()
+      ) {
 
         setSearchError(
           "You cannot add yourself."
@@ -86,40 +96,22 @@ function ChatApp({ user }) {
         return;
       }
 
-
       try {
 
         setSearching(true);
 
+        const results =
+          await searchUsers(value);
 
-        const q = query(
-          collection(db, "users"),
-          where("email", "==", email)
-        );
+        setSearchResults(results);
 
-
-        const snapshot =
-          await getDocs(q);
-
-
-        const users =
-          snapshot.docs.map((item) => ({
-            id: item.id,
-            ...item.data()
-          }));
-
-
-        setSearchResults(users);
-
-
-        if (users.length === 0) {
+        if (results.length === 0) {
 
           setSearchError(
             "No users found."
           );
 
         }
-
 
       } catch (error) {
 
@@ -129,7 +121,7 @@ function ChatApp({ user }) {
         );
 
         setSearchError(
-          "Search failed. Please try again."
+          "Search failed. Check Firebase."
         );
 
       } finally {
@@ -138,14 +130,7 @@ function ChatApp({ user }) {
 
       }
 
-    };
-
-
-    const timer =
-      setTimeout(
-        searchPeople,
-        400
-      );
+    }, 400);
 
 
     return () =>
@@ -154,13 +139,94 @@ function ChatApp({ user }) {
   }, [search, user]);
 
 
-  /*
-   * ADD CONTACT
-   */
+  /* ================================
+     LOAD CONTACTS
+  ================================= */
+
+  useEffect(() => {
+
+    if (!user?.uid) {
+      return;
+    }
+
+    const contactsRef =
+      collection(
+        db,
+        "users",
+        user.uid,
+        "contacts"
+      );
+
+
+    const unsubscribe =
+      onSnapshot(
+        contactsRef,
+        (snapshot) => {
+
+          const list =
+            snapshot.docs.map(
+              (item) => ({
+                id: item.id,
+                ...item.data()
+              })
+            );
+
+          setContacts(list);
+
+        },
+        (error) => {
+
+          console.error(
+            "Contacts error:",
+            error
+          );
+
+        }
+      );
+
+
+    return unsubscribe;
+
+  }, [user]);
+
+
+  /* ================================
+     ADD CONTACT
+  ================================= */
 
   const addContact = async (person) => {
 
+    if (!person?.uid) {
+      return;
+    }
+
+
     try {
+
+      /*
+       * Check if already added
+       */
+
+      const alreadyAdded =
+        contacts.some(
+          (contact) =>
+            contact.uid === person.uid
+        );
+
+
+      if (alreadyAdded) {
+
+        setSearchError(
+          "Already in your contacts."
+        );
+
+        return;
+      }
+
+
+      /*
+       * Create contact
+       */
 
       await addDoc(
         collection(
@@ -171,38 +237,30 @@ function ChatApp({ user }) {
         ),
         {
           uid: person.uid,
-          name: person.name,
-          email: person.email,
+
+          name:
+            person.name || "",
+
+          email:
+            person.email || "",
+
           photoURL:
             person.photoURL || "",
+
           addedAt:
             serverTimestamp()
         }
       );
 
 
-      setContacts((prev) => {
-
-        const exists =
-          prev.some(
-            (item) =>
-              item.uid === person.uid
-          );
-
-        if (exists) {
-          return prev;
-        }
-
-        return [
-          ...prev,
-          person
-        ];
-
-      });
-
+      /*
+       * Clear search
+       */
 
       setSearch("");
       setSearchResults([]);
+      setSearchError("");
+
 
     } catch (error) {
 
@@ -220,9 +278,9 @@ function ChatApp({ user }) {
   };
 
 
-  /*
-   * SEND MESSAGE
-   */
+  /* ================================
+     SEND MESSAGE
+  ================================= */
 
   const sendMessage = () => {
 
@@ -234,14 +292,46 @@ function ChatApp({ user }) {
       return;
     }
 
+
+    /*
+     * Realtime message system
+     * will be connected next.
+     */
+
     console.log(
-      "Send message:",
-      message,
-      "to:",
-      activeChat
+      "Message:",
+      message
     );
 
+    console.log(
+      "Receiver:",
+      activeChat.uid
+    );
+
+
     setMessage("");
+
+  };
+
+
+  /* ================================
+     LOGOUT
+  ================================= */
+
+  const logout = async () => {
+
+    try {
+
+      await signOut(auth);
+
+    } catch (error) {
+
+      console.error(
+        "Logout error:",
+        error
+      );
+
+    }
 
   };
 
@@ -251,7 +341,9 @@ function ChatApp({ user }) {
     <div className="app">
 
 
-      {/* SIDEBAR */}
+      {/* =================================
+          SIDEBAR
+      ================================== */}
 
       <aside className="sidebar">
 
@@ -296,10 +388,12 @@ function ChatApp({ user }) {
           />
 
           {searching && (
+
             <Loader2
-              size={16}
+              size={17}
               className="spin"
             />
+
           )}
 
         </div>
@@ -311,68 +405,78 @@ function ChatApp({ user }) {
 
           <div className="search-results">
 
-            {searchError && !searching && (
 
-              <div className="search-empty">
-                {searchError}
-              </div>
+            {searchError &&
+              !searching && (
 
-            )}
+                <div className="search-empty">
 
-
-            {searchResults.map((person) => (
-
-              <div
-                className="user-result"
-                key={person.uid}
-              >
-
-                <div className="avatar">
-
-                  {person.name
-                    ?.charAt(0)
-                    ?.toUpperCase() || "U"}
+                  {searchError}
 
                 </div>
 
-
-                <div className="user-result-info">
-
-                  <strong>
-                    {person.name}
-                  </strong>
-
-                  <span>
-                    {person.email}
-                  </span>
-
-                </div>
+              )}
 
 
-                <button
-                  className="add-contact-btn"
-                  onClick={() =>
-                    addContact(person)
-                  }
-                  title="Add contact"
+            {searchResults.map(
+              (person) => (
+
+                <div
+                  className="user-result"
+                  key={person.uid}
                 >
 
-                  <UserPlus
-                    size={18}
-                  />
 
-                </button>
+                  <div className="avatar">
 
-              </div>
+                    {person.name
+                      ?.charAt(0)
+                      ?.toUpperCase() ||
+                      "U"}
 
-            ))}
+                  </div>
+
+
+                  <div className="user-result-info">
+
+                    <strong>
+                      {person.name ||
+                        "Unknown user"}
+                    </strong>
+
+                    <span>
+                      {person.email}
+                    </span>
+
+                  </div>
+
+
+                  <button
+                    className="add-contact-btn"
+                    onClick={() =>
+                      addContact(person)
+                    }
+                    title="Add contact"
+                  >
+
+                    <UserPlus
+                      size={18}
+                    />
+
+                  </button>
+
+
+                </div>
+
+              )
+            )}
 
           </div>
 
         )}
 
 
-        {/* CONTACTS */}
+        {/* CONTACT TITLE */}
 
         <div className="section-title">
 
@@ -389,7 +493,10 @@ function ChatApp({ user }) {
         </div>
 
 
+        {/* CONTACT LIST */}
+
         <div className="chat-list">
+
 
           {contacts.length === 0 ? (
 
@@ -409,67 +516,79 @@ function ChatApp({ user }) {
 
           ) : (
 
-            contacts.map((contact) => (
+            contacts.map(
+              (contact) => (
 
-              <button
-                key={contact.uid}
-                className={`chat-item ${
-                  activeChat?.uid ===
-                  contact.uid
-                    ? "active"
-                    : ""
-                }`}
-                onClick={() =>
-                  setActiveChat(contact)
-                }
-              >
-
-                <div className="avatar">
-
-                  {contact.name
-                    ?.charAt(0)
-                    ?.toUpperCase() || "U"}
-
-                </div>
+                <button
+                  key={contact.id}
+                  className={`chat-item ${
+                    activeChat?.uid ===
+                    contact.uid
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    setActiveChat(
+                      contact
+                    )
+                  }
+                >
 
 
-                <div className="chat-info">
+                  <div className="avatar">
 
-                  <div className="chat-top">
-
-                    <strong>
-                      {contact.name}
-                    </strong>
+                    {contact.name
+                      ?.charAt(0)
+                      ?.toUpperCase() ||
+                      "U"}
 
                   </div>
 
 
-                  <div className="chat-bottom">
+                  <div className="chat-info">
 
-                    <p>
-                      {contact.email}
-                    </p>
+
+                    <div className="chat-top">
+
+                      <strong>
+                        {contact.name}
+                      </strong>
+
+                    </div>
+
+
+                    <div className="chat-bottom">
+
+                      <p>
+                        {contact.email}
+                      </p>
+
+                    </div>
+
 
                   </div>
 
-                </div>
 
-              </button>
+                </button>
 
-            ))
+              )
+            )
 
           )}
 
         </div>
 
 
-        {/* SIDEBAR BOTTOM */}
+        {/* SIDEBAR MENU */}
 
         <div className="sidebar-bottom">
 
+
           <button>
 
-            <MessageCircle size={20} />
+            <MessageCircle
+              size={20}
+            />
 
             <span>
               Chats
@@ -491,7 +610,9 @@ function ChatApp({ user }) {
 
           <button>
 
-            <Settings size={20} />
+            <Settings
+              size={20}
+            />
 
             <span>
               Settings
@@ -501,9 +622,7 @@ function ChatApp({ user }) {
 
 
           <button
-            onClick={() =>
-              signOut(auth)
-            }
+            onClick={logout}
           >
 
             <LogOut size={20} />
@@ -514,12 +633,16 @@ function ChatApp({ user }) {
 
           </button>
 
+
         </div>
+
 
       </aside>
 
 
-      {/* CHAT */}
+      {/* =================================
+          CHAT AREA
+      ================================== */}
 
       <main className="chat">
 
@@ -528,18 +651,22 @@ function ChatApp({ user }) {
 
           <div className="empty-chat">
 
+
             <div className="empty-chat-logo">
               SR
             </div>
+
 
             <h2>
               Welcome to SRChat
             </h2>
 
+
             <p>
-              Search for someone by email
+              Search for a user by email
               and add them to your contacts.
             </p>
+
 
           </div>
 
@@ -547,17 +674,21 @@ function ChatApp({ user }) {
 
           <>
 
-            {/* HEADER */}
+
+            {/* CHAT HEADER */}
 
             <header className="chat-header">
 
+
               <div className="chat-user">
+
 
                 <div className="avatar large">
 
                   {activeChat.name
                     ?.charAt(0)
-                    ?.toUpperCase() || "U"}
+                    ?.toUpperCase() ||
+                    "U"}
 
                 </div>
 
@@ -574,26 +705,38 @@ function ChatApp({ user }) {
 
                 </div>
 
+
               </div>
 
 
               <div className="header-actions">
 
+
                 <button className="icon-btn">
+
                   <Phone size={19} />
+
                 </button>
 
+
                 <button className="icon-btn">
+
                   <Video size={19} />
+
                 </button>
 
+
                 <button className="icon-btn">
+
                   <MoreVertical
                     size={20}
                   />
+
                 </button>
 
+
               </div>
+
 
             </header>
 
@@ -601,6 +744,7 @@ function ChatApp({ user }) {
             {/* MESSAGES */}
 
             <section className="messages">
+
 
               <div className="date-divider">
 
@@ -623,12 +767,14 @@ function ChatApp({ user }) {
 
               </div>
 
+
             </section>
 
 
             {/* MESSAGE INPUT */}
 
             <div className="message-area">
+
 
               <button className="icon-btn">
 
@@ -651,12 +797,15 @@ function ChatApp({ user }) {
               <input
                 value={message}
                 onChange={(e) =>
-                  setMessage(e.target.value)
+                  setMessage(
+                    e.target.value
+                  )
                 }
                 onKeyDown={(e) => {
 
                   if (
-                    e.key === "Enter"
+                    e.key ===
+                    "Enter"
                   ) {
 
                     sendMessage();
@@ -683,7 +832,9 @@ function ChatApp({ user }) {
 
               ) : (
 
-                <button className="send-btn">
+                <button
+                  className="send-btn"
+                >
 
                   <Mic size={20} />
 
@@ -691,13 +842,17 @@ function ChatApp({ user }) {
 
               )}
 
+
             </div>
+
 
           </>
 
         )}
 
+
       </main>
+
 
     </div>
 
@@ -706,9 +861,9 @@ function ChatApp({ user }) {
 }
 
 
-/*
- * MAIN APP
- */
+/* =================================
+   MAIN APP
+================================= */
 
 function App() {
 
@@ -729,7 +884,9 @@ function App() {
         auth,
         (currentUser) => {
 
-          setUser(currentUser);
+          setUser(
+            currentUser
+          );
 
           setLoading(false);
 
@@ -741,6 +898,8 @@ function App() {
 
   }, []);
 
+
+  /* LOADING */
 
   if (loading) {
 
@@ -763,7 +922,10 @@ function App() {
   }
 
 
+  /* LOGIN / REGISTER */
+
   if (!user) {
+
 
     if (showRegister) {
 
@@ -771,7 +933,9 @@ function App() {
 
         <Register
           onLogin={() =>
-            setShowRegister(false)
+            setShowRegister(
+              false
+            )
           }
         />
 
@@ -784,7 +948,9 @@ function App() {
 
       <Login
         onRegister={() =>
-          setShowRegister(true)
+          setShowRegister(
+            true
+          )
         }
       />
 
@@ -792,6 +958,8 @@ function App() {
 
   }
 
+
+  /* CHAT APP */
 
   return (
     <ChatApp user={user} />
