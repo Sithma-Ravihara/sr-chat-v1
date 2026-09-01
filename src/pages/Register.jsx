@@ -17,7 +17,6 @@ import {
   Mail,
   Lock,
   User,
-  AtSign,
   Loader2
 } from "lucide-react";
 
@@ -25,7 +24,6 @@ import {
 function Register({ onLogin }) {
 
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -39,36 +37,23 @@ function Register({ onLogin }) {
 
     setError("");
 
+
     const cleanName = name.trim();
-
-    const cleanUsername =
-      username
-        .trim()
-        .toLowerCase()
-        .replace(/^@/, "");
-
-    const cleanEmail =
-      email.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
 
 
     if (!cleanName) {
+
       setError("Please enter your name.");
-      return;
-    }
-
-
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(cleanUsername)) {
-
-      setError(
-        "Username must be 3-20 characters using letters, numbers or _."
-      );
 
       return;
     }
 
 
     if (!cleanEmail) {
+
       setError("Please enter your email.");
+
       return;
     }
 
@@ -113,7 +98,7 @@ function Register({ onLogin }) {
 
 
       /*
-       * 3. CREATE FIRESTORE USER DOCUMENT
+       * 3. CREATE FIRESTORE USER
        */
 
       await setDoc(
@@ -130,43 +115,11 @@ function Register({ onLogin }) {
           nameLower:
             cleanName.toLowerCase(),
 
-          username:
-            cleanUsername,
+          email: cleanEmail,
 
-          usernameLower:
-            cleanUsername,
+          photoURL: "",
 
-          email:
-            cleanEmail,
-
-          photoURL:
-            "",
-
-          status:
-            "online",
-
-          createdAt:
-            serverTimestamp()
-        }
-      );
-
-
-      /*
-       * 4. SAVE USERNAME
-       */
-
-      await setDoc(
-        doc(
-          db,
-          "usernames",
-          cleanUsername
-        ),
-        {
-          uid:
-            result.user.uid,
-
-          username:
-            cleanUsername,
+          status: "online",
 
           createdAt:
             serverTimestamp()
@@ -175,14 +128,15 @@ function Register({ onLogin }) {
 
 
       console.log(
-        "SRChat account created successfully."
+        "User created successfully:",
+        result.user.uid
       );
 
 
     } catch (err) {
 
       console.error(
-        "SRChat registration error:",
+        "Registration error:",
         err
       );
 
@@ -211,7 +165,7 @@ function Register({ onLogin }) {
       ) {
 
         setError(
-          "Password is too weak."
+          "Password must contain at least 6 characters."
         );
 
       } else if (
@@ -224,13 +178,14 @@ function Register({ onLogin }) {
         );
 
       } else if (
+        err.message &&
         err.message
-          ?.toLowerCase()
+          .toLowerCase()
           .includes("offline")
       ) {
 
         setError(
-          "Cannot connect to Firebase. Please check your internet connection and try again."
+          "Firebase is offline. Please check your internet connection."
         );
 
       } else {
@@ -257,10 +212,15 @@ function Register({ onLogin }) {
 
       <div className="auth-card">
 
+
+        {/* LOGO */}
+
         <div className="auth-logo">
           SR
         </div>
 
+
+        {/* HEADING */}
 
         <div className="auth-heading">
 
@@ -269,7 +229,7 @@ function Register({ onLogin }) {
           </h1>
 
           <p>
-            Create your SRChat username.
+            Join SRChat and start messaging.
           </p>
 
         </div>
@@ -298,33 +258,6 @@ function Register({ onLogin }) {
                   setName(e.target.value)
                 }
                 autoComplete="name"
-              />
-
-            </div>
-
-          </label>
-
-
-          {/* USERNAME */}
-
-          <label>
-
-            <span>
-              Username
-            </span>
-
-            <div className="auth-input">
-
-              <AtSign size={18} />
-
-              <input
-                type="text"
-                placeholder="sithma"
-                value={username}
-                onChange={(e) =>
-                  setUsername(e.target.value)
-                }
-                autoComplete="username"
               />
 
             </div>
@@ -397,7 +330,7 @@ function Register({ onLogin }) {
           )}
 
 
-          {/* CREATE ACCOUNT */}
+          {/* BUTTON */}
 
           <button
             className="auth-submit"
@@ -431,6 +364,8 @@ function Register({ onLogin }) {
 
         </form>
 
+
+        {/* LOGIN */}
 
         <p className="auth-switch">
 
