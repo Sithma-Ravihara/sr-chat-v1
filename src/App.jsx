@@ -14,7 +14,10 @@ import {
 
 import { auth, db } from "./firebase";
 
-import { searchUsers } from "./services/users";
+import {
+  sendChatMessage,
+  listenToMessages
+} from "./services/messages";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -39,9 +42,9 @@ import {
 } from "lucide-react";
 
 
-/* ================================
+/* =========================================
    CHAT APP
-================================ */
+========================================= */
 
 function ChatApp({ user }) {
 
@@ -62,13 +65,19 @@ function ChatApp({ user }) {
   const [activeChat, setActiveChat] =
     useState(null);
 
+  const [messages, setMessages] =
+    useState([]);
+
   const [message, setMessage] =
     useState("");
 
+  const [sending, setSending] =
+    useState(false);
 
-  /* ================================
+
+  /* =========================================
      SEARCH USERS
-  ================================= */
+  ========================================= */
 
   useEffect(() => {
 
@@ -100,6 +109,11 @@ function ChatApp({ user }) {
 
         setSearching(true);
 
+        const { searchUsers } =
+          await import(
+            "./services/users"
+          );
+
         const results =
           await searchUsers(value);
 
@@ -121,7 +135,7 @@ function ChatApp({ user }) {
         );
 
         setSearchError(
-          "Search failed. Check Firebase."
+          "Search failed."
         );
 
       } finally {
@@ -139,9 +153,9 @@ function ChatApp({ user }) {
   }, [search, user]);
 
 
-  /* ================================
+  /* =========================================
      LOAD CONTACTS
-  ================================= */
+  ========================================= */
 
   useEffect(() => {
 
@@ -190,9 +204,59 @@ function ChatApp({ user }) {
   }, [user]);
 
 
-  /* ================================
+  /* =========================================
+     REALTIME MESSAGE LISTENER
+  ========================================= */
+
+  useEffect(() => {
+
+    setMessages([]);
+
+    if (!activeChat?.uid) {
+      return;
+    }
+
+
+    /*
+     * IMPORTANT:
+     * Both users get the same chat ID.
+     */
+
+    const chatId = [
+      user.uid,
+      activeChat.uid
+    ]
+      .sort()
+      .join("_");
+
+
+    console.log(
+      "Listening to chat:",
+      chatId
+    );
+
+
+    const unsubscribe =
+      listenToMessages(
+        chatId,
+        (newMessages) => {
+
+          setMessages(
+            newMessages
+          );
+
+        }
+      );
+
+
+    return unsubscribe;
+
+  }, [activeChat, user]);
+
+
+  /* =========================================
      ADD CONTACT
-  ================================= */
+  ========================================= */
 
   const addContact = async (person) => {
 
@@ -203,18 +267,14 @@ function ChatApp({ user }) {
 
     try {
 
-      /*
-       * Check if already added
-       */
-
-      const alreadyAdded =
+      const exists =
         contacts.some(
           (contact) =>
             contact.uid === person.uid
         );
 
 
-      if (alreadyAdded) {
+      if (exists) {
 
         setSearchError(
           "Already in your contacts."
@@ -223,10 +283,6 @@ function ChatApp({ user }) {
         return;
       }
 
-
-      /*
-       * Create contact
-       */
 
       await addDoc(
         collection(
@@ -237,25 +293,15 @@ function ChatApp({ user }) {
         ),
         {
           uid: person.uid,
-
-          name:
-            person.name || "",
-
-          email:
-            person.email || "",
-
+          name: person.name || "",
+          email: person.email || "",
           photoURL:
             person.photoURL || "",
-
           addedAt:
             serverTimestamp()
         }
       );
 
-
-      /*
-       * Clear search
-       */
 
       setSearch("");
       setSearchResults([]);
@@ -278,72 +324,91 @@ function ChatApp({ user }) {
   };
 
 
-  /* ================================
+  /* =========================================
      SEND MESSAGE
-  ================================= */
+  ========================================= */
 
-  const sendMessage = () => {
+  const handleSendMessage = async () => {
 
     if (!message.trim()) {
       return;
     }
 
-    if (!activeChat) {
+    if (!activeChat?.uid) {
+      return;
+    }
+
+    if (sending) {
       return;
     }
 
 
     /*
-     * Realtime message system
-     * will be connected next.
+     * SAME CHAT ID FOR BOTH USERS
      */
 
-    console.log(
-      "Message:",
-      message
-    );
-
-    console.log(
-      "Receiver:",
+    const chatId = [
+      user.uid,
       activeChat.uid
-    );
+    ]
+      .sort()
+      .join("_");
 
-
-    setMessage("");
-
-  };
-
-
-  /* ================================
-     LOGOUT
-  ================================= */
-
-  const logout = async () => {
 
     try {
 
-      await signOut(auth);
+      setSending(true);
+
+
+      await sendChatMessage(
+        chatId,
+        user.uid,
+        message
+      );
+
+
+      setMessage("");
+
 
     } catch (error) {
 
       console.error(
-        "Logout error:",
+        "Send message error:",
         error
       );
+
+    } finally {
+
+      setSending(false);
 
     }
 
   };
 
+
+  /* =========================================
+     LOGOUT
+  ========================================= */
+
+  const logout = async () => {
+
+    await signOut(auth);
+
+  };
+
+
+  /* =========================================
+     UI
+  ========================================= */
 
   return (
 
     <div className="app">
 
 
-      {/* =================================
+      {/* =====================================
           SIDEBAR
-      ================================== */}
+      ====================================== */}
 
       <aside className="sidebar">
 
@@ -405,7 +470,6 @@ function ChatApp({ user }) {
 
           <div className="search-results">
 
-
             {searchError &&
               !searching && (
 
@@ -426,7 +490,6 @@ function ChatApp({ user }) {
                   key={person.uid}
                 >
 
-
                   <div className="avatar">
 
                     {person.name
@@ -441,7 +504,7 @@ function ChatApp({ user }) {
 
                     <strong>
                       {person.name ||
-                        "Unknown user"}
+                        "User"}
                     </strong>
 
                     <span>
@@ -456,7 +519,6 @@ function ChatApp({ user }) {
                     onClick={() =>
                       addContact(person)
                     }
-                    title="Add contact"
                   >
 
                     <UserPlus
@@ -464,7 +526,6 @@ function ChatApp({ user }) {
                     />
 
                   </button>
-
 
                 </div>
 
@@ -493,7 +554,7 @@ function ChatApp({ user }) {
         </div>
 
 
-        {/* CONTACT LIST */}
+        {/* CONTACTS */}
 
         <div className="chat-list">
 
@@ -534,7 +595,6 @@ function ChatApp({ user }) {
                   }
                 >
 
-
                   <div className="avatar">
 
                     {contact.name
@@ -546,7 +606,6 @@ function ChatApp({ user }) {
 
 
                   <div className="chat-info">
-
 
                     <div className="chat-top">
 
@@ -565,9 +624,7 @@ function ChatApp({ user }) {
 
                     </div>
 
-
                   </div>
-
 
                 </button>
 
@@ -579,10 +636,9 @@ function ChatApp({ user }) {
         </div>
 
 
-        {/* SIDEBAR MENU */}
+        {/* BOTTOM MENU */}
 
         <div className="sidebar-bottom">
-
 
           <button>
 
@@ -633,16 +689,15 @@ function ChatApp({ user }) {
 
           </button>
 
-
         </div>
 
 
       </aside>
 
 
-      {/* =================================
+      {/* =====================================
           CHAT AREA
-      ================================== */}
+      ====================================== */}
 
       <main className="chat">
 
@@ -651,22 +706,18 @@ function ChatApp({ user }) {
 
           <div className="empty-chat">
 
-
             <div className="empty-chat-logo">
               SR
             </div>
-
 
             <h2>
               Welcome to SRChat
             </h2>
 
-
             <p>
-              Search for a user by email
-              and add them to your contacts.
+              Search for a user and add
+              them to your contacts.
             </p>
-
 
           </div>
 
@@ -679,9 +730,7 @@ function ChatApp({ user }) {
 
             <header className="chat-header">
 
-
               <div className="chat-user">
-
 
                 <div className="avatar large">
 
@@ -705,12 +754,10 @@ function ChatApp({ user }) {
 
                 </div>
 
-
               </div>
 
 
               <div className="header-actions">
-
 
                 <button className="icon-btn">
 
@@ -734,9 +781,7 @@ function ChatApp({ user }) {
 
                 </button>
 
-
               </div>
-
 
             </header>
 
@@ -755,18 +800,87 @@ function ChatApp({ user }) {
               </div>
 
 
-              <div className="message received">
+              {messages.length === 0 ? (
 
-                <p>
-                  Start a conversation 👋
-                </p>
+                <div className="no-messages">
 
-                <span>
-                  Now
-                </span>
+                  <p>
+                    No messages yet.
+                  </p>
 
-              </div>
+                  <span>
+                    Send a message to start
+                    the conversation.
+                  </span>
 
+                </div>
+
+              ) : (
+
+                messages.map(
+                  (item) => {
+
+                    const isMine =
+                      item.senderId ===
+                      user.uid;
+
+
+                    return (
+
+                      <div
+                        key={item.id}
+                        className={`message ${
+                          isMine
+                            ? "sent"
+                            : "received"
+                        }`}
+                      >
+
+                        <p>
+                          {item.text}
+                        </p>
+
+
+                        <div className="message-meta">
+
+                          <span>
+
+                            {item.createdAt
+                              ?.toDate
+                              ? item.createdAt
+                                  .toDate()
+                                  .toLocaleTimeString(
+                                    [],
+                                    {
+                                      hour:
+                                        "2-digit",
+                                      minute:
+                                        "2-digit"
+                                    }
+                                  )
+                              : "Now"}
+
+                          </span>
+
+
+                          {isMine && (
+
+                            <CheckCheck
+                              size={15}
+                            />
+
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    );
+
+                  }
+                )
+
+              )}
 
             </section>
 
@@ -776,7 +890,9 @@ function ChatApp({ user }) {
             <div className="message-area">
 
 
-              <button className="icon-btn">
+              <button
+                className="icon-btn"
+              >
 
                 <Paperclip
                   size={21}
@@ -785,7 +901,9 @@ function ChatApp({ user }) {
               </button>
 
 
-              <button className="icon-btn">
+              <button
+                className="icon-btn"
+              >
 
                 <Smile
                   size={21}
@@ -808,12 +926,13 @@ function ChatApp({ user }) {
                     "Enter"
                   ) {
 
-                    sendMessage();
+                    handleSendMessage();
 
                   }
 
                 }}
                 placeholder="Write a message..."
+                disabled={sending}
               />
 
 
@@ -822,11 +941,23 @@ function ChatApp({ user }) {
                 <button
                   className="send-btn"
                   onClick={
-                    sendMessage
+                    handleSendMessage
                   }
+                  disabled={sending}
                 >
 
-                  <Send size={20} />
+                  {sending ? (
+
+                    <Loader2
+                      size={20}
+                      className="spin"
+                    />
+
+                  ) : (
+
+                    <Send size={20} />
+
+                  )}
 
                 </button>
 
@@ -850,9 +981,7 @@ function ChatApp({ user }) {
 
         )}
 
-
       </main>
-
 
     </div>
 
@@ -861,9 +990,9 @@ function ChatApp({ user }) {
 }
 
 
-/* =================================
-   MAIN APP
-================================= */
+/* =========================================
+   ROOT APP
+========================================= */
 
 function App() {
 
@@ -922,10 +1051,9 @@ function App() {
   }
 
 
-  /* LOGIN / REGISTER */
+  /* AUTH */
 
   if (!user) {
-
 
     if (showRegister) {
 
@@ -958,8 +1086,6 @@ function App() {
 
   }
 
-
-  /* CHAT APP */
 
   return (
     <ChatApp user={user} />
