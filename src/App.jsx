@@ -56,7 +56,6 @@ function ChatApp({ user }) {
 
   const sendMessage = () => {
     if (!message.trim()) return;
-
     setMessage("");
   };
 
@@ -66,10 +65,7 @@ function ChatApp({ user }) {
       <aside className="sidebar">
 
         <div className="brand">
-
-          <div className="brand-logo">
-            SR
-          </div>
+          <div className="brand-logo">SR</div>
 
           <div>
             <h1>SRChat</h1>
@@ -77,34 +73,27 @@ function ChatApp({ user }) {
               {user.displayName || user.email}
             </span>
           </div>
-
         </div>
 
         <div className="search-box">
-
           <Search size={18} />
-
           <input
             type="text"
             placeholder="Search chats..."
           />
-
         </div>
 
         <div className="section-title">
-
           <span>Recent chats</span>
 
           <button className="icon-btn">
             <Plus size={18} />
           </button>
-
         </div>
 
         <div className="chat-list">
 
           {contacts.map((contact) => (
-
             <button
               key={contact.id}
               className={`chat-item ${
@@ -116,47 +105,33 @@ function ChatApp({ user }) {
             >
 
               <div className="avatar">
-
                 {contact.avatar}
 
                 {contact.online && (
                   <span className="online-dot" />
                 )}
-
               </div>
 
               <div className="chat-info">
 
                 <div className="chat-top">
-
-                  <strong>
-                    {contact.name}
-                  </strong>
-
-                  <span>
-                    {contact.time}
-                  </span>
-
+                  <strong>{contact.name}</strong>
+                  <span>{contact.time}</span>
                 </div>
 
                 <div className="chat-bottom">
-
-                  <p>
-                    {contact.message}
-                  </p>
+                  <p>{contact.message}</p>
 
                   {contact.unread > 0 && (
                     <span className="unread">
                       {contact.unread}
                     </span>
                   )}
-
                 </div>
 
               </div>
 
             </button>
-
           ))}
 
         </div>
@@ -180,7 +155,6 @@ function ChatApp({ user }) {
 
           <button
             onClick={() => signOut(auth)}
-            title="Sign out"
           >
             <LogOut size={20} />
             <span>Logout</span>
@@ -197,27 +171,21 @@ function ChatApp({ user }) {
           <div className="chat-user">
 
             <div className="avatar large">
-
               {activeChat.avatar}
 
               {activeChat.online && (
                 <span className="online-dot" />
               )}
-
             </div>
 
             <div>
-
-              <h2>
-                {activeChat.name}
-              </h2>
+              <h2>{activeChat.name}</h2>
 
               <span>
                 {activeChat.online
                   ? "Online"
                   : "Offline"}
               </span>
-
             </div>
 
           </div>
@@ -247,31 +215,18 @@ function ChatApp({ user }) {
           </div>
 
           <div className="message received">
-
-            <p>
-              Hey! 👋
-            </p>
-
-            <span>
-              12:30
-            </span>
-
+            <p>Hey! 👋</p>
+            <span>12:30</span>
           </div>
 
           <div className="message received">
-
             <p>
               Are you working on the new chat app?
             </p>
-
-            <span>
-              12:31
-            </span>
-
+            <span>12:31</span>
           </div>
 
           <div className="message sent">
-
             <p>
               Yes! 🔥 I'm building SRChat.
             </p>
@@ -280,11 +235,9 @@ function ChatApp({ user }) {
               <span>12:31</span>
               <CheckCheck size={15} />
             </div>
-
           </div>
 
           <div className="message sent">
-
             <p>
               It's going to have realtime chat,
               contacts and groups.
@@ -294,7 +247,6 @@ function ChatApp({ user }) {
               <span>12:32</span>
               <CheckCheck size={15} />
             </div>
-
           </div>
 
         </section>
@@ -323,20 +275,16 @@ function ChatApp({ user }) {
           />
 
           {message.trim() ? (
-
             <button
               className="send-btn"
               onClick={sendMessage}
             >
               <Send size={20} />
             </button>
-
           ) : (
-
             <button className="send-btn">
               <Mic size={20} />
             </button>
-
           )}
 
         </div>
@@ -368,31 +316,25 @@ function App() {
   }, []);
 
   if (loading) {
-
     return (
       <div className="loading-screen">
         <div className="loading-logo">
           SR
         </div>
 
-        <p>
-          Loading SRChat...
-        </p>
+        <p>Loading SRChat...</p>
       </div>
     );
-
   }
 
   if (!user) {
 
     if (showRegister) {
-
       return (
         <Register
           onLogin={() => setShowRegister(false)}
         />
       );
-
     }
 
     return (
@@ -400,7 +342,6 @@ function App() {
         onRegister={() => setShowRegister(true)}
       />
     );
-
   }
 
   return <ChatApp user={user} />;
