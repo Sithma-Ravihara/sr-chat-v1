@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "./firebase";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import {
   Search,
   MessageCircle,
@@ -12,7 +16,8 @@ import {
   Phone,
   Video,
   Smile,
-  CheckCheck
+  CheckCheck,
+  LogOut
 } from "lucide-react";
 
 const contacts = [
@@ -45,7 +50,7 @@ const contacts = [
   }
 ];
 
-function App() {
+function ChatApp({ user }) {
   const [activeChat, setActiveChat] = useState(contacts[0]);
   const [message, setMessage] = useState("");
 
@@ -58,41 +63,48 @@ function App() {
   return (
     <div className="app">
 
-      {/* SIDEBAR */}
-
       <aside className="sidebar">
 
         <div className="brand">
+
           <div className="brand-logo">
             SR
           </div>
 
           <div>
             <h1>SRChat</h1>
-            <span>Messages</span>
+            <span>
+              {user.displayName || user.email}
+            </span>
           </div>
+
         </div>
 
         <div className="search-box">
+
           <Search size={18} />
 
           <input
             type="text"
             placeholder="Search chats..."
           />
+
         </div>
 
         <div className="section-title">
+
           <span>Recent chats</span>
 
           <button className="icon-btn">
             <Plus size={18} />
           </button>
+
         </div>
 
         <div className="chat-list">
 
           {contacts.map((contact) => (
+
             <button
               key={contact.id}
               className={`chat-item ${
@@ -144,6 +156,7 @@ function App() {
               </div>
 
             </button>
+
           ))}
 
         </div>
@@ -165,37 +178,46 @@ function App() {
             <span>Settings</span>
           </button>
 
+          <button
+            onClick={() => signOut(auth)}
+            title="Sign out"
+          >
+            <LogOut size={20} />
+            <span>Logout</span>
+          </button>
+
         </div>
 
       </aside>
 
-
-      {/* CHAT */}
-
       <main className="chat">
-
-        {/* HEADER */}
 
         <header className="chat-header">
 
           <div className="chat-user">
 
             <div className="avatar large">
+
               {activeChat.avatar}
 
               {activeChat.online && (
                 <span className="online-dot" />
               )}
+
             </div>
 
             <div>
-              <h2>{activeChat.name}</h2>
+
+              <h2>
+                {activeChat.name}
+              </h2>
 
               <span>
                 {activeChat.online
                   ? "Online"
                   : "Offline"}
               </span>
+
             </div>
 
           </div>
@@ -218,9 +240,6 @@ function App() {
 
         </header>
 
-
-        {/* MESSAGES */}
-
         <section className="messages">
 
           <div className="date-divider">
@@ -228,6 +247,7 @@ function App() {
           </div>
 
           <div className="message received">
+
             <p>
               Hey! 👋
             </p>
@@ -235,9 +255,11 @@ function App() {
             <span>
               12:30
             </span>
+
           </div>
 
           <div className="message received">
+
             <p>
               Are you working on the new chat app?
             </p>
@@ -245,9 +267,11 @@ function App() {
             <span>
               12:31
             </span>
+
           </div>
 
           <div className="message sent">
+
             <p>
               Yes! 🔥 I'm building SRChat.
             </p>
@@ -256,9 +280,11 @@ function App() {
               <span>12:31</span>
               <CheckCheck size={15} />
             </div>
+
           </div>
 
           <div className="message sent">
+
             <p>
               It's going to have realtime chat,
               contacts and groups.
@@ -268,12 +294,10 @@ function App() {
               <span>12:32</span>
               <CheckCheck size={15} />
             </div>
+
           </div>
 
         </section>
-
-
-        {/* MESSAGE INPUT */}
 
         <div className="message-area">
 
@@ -299,16 +323,20 @@ function App() {
           />
 
           {message.trim() ? (
+
             <button
               className="send-btn"
               onClick={sendMessage}
             >
               <Send size={20} />
             </button>
+
           ) : (
+
             <button className="send-btn">
               <Mic size={20} />
             </button>
+
           )}
 
         </div>
@@ -317,6 +345,65 @@ function App() {
 
     </div>
   );
+}
+
+function App() {
+
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
+
+  useEffect(() => {
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        setUser(currentUser);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+
+  }, []);
+
+  if (loading) {
+
+    return (
+      <div className="loading-screen">
+        <div className="loading-logo">
+          SR
+        </div>
+
+        <p>
+          Loading SRChat...
+        </p>
+      </div>
+    );
+
+  }
+
+  if (!user) {
+
+    if (showRegister) {
+
+      return (
+        <Register
+          onLogin={() => setShowRegister(false)}
+        />
+      );
+
+    }
+
+    return (
+      <Login
+        onRegister={() => setShowRegister(true)}
+      />
+    );
+
+  }
+
+  return <ChatApp user={user} />;
 }
 
 export default App;
