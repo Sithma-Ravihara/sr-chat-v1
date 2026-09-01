@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   onAuthStateChanged,
   signOut
@@ -9,7 +10,8 @@ import {
   query,
   where,
   getDocs,
-  limit
+  addDoc,
+  serverTimestamp
 } from "firebase/firestore";
 
 import { auth, db } from "./firebase";
@@ -33,175 +35,210 @@ import {
   CheckCheck,
   LogOut,
   UserPlus,
-  X
+  Loader2
 } from "lucide-react";
 
 
-/* --------------------------------
-   SEARCH USERS
--------------------------------- */
-
-async function searchUsers(searchText, currentUserId) {
-
-  const text = searchText.trim().toLowerCase();
-
-  if (!text) {
-    return [];
-  }
-
-  try {
-
-    const usersRef = collection(db, "users");
-
-    const usersQuery = query(
-      usersRef,
-      where("nameLower", ">=", text),
-      where("nameLower", "<=", text + "\uf8ff"),
-      limit(20)
-    );
-
-    const snapshot = await getDocs(usersQuery);
-
-    return snapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      .filter(
-        (user) => user.uid !== currentUserId
-      );
-
-  } catch (error) {
-
-    console.error(
-      "User search error:",
-      error
-    );
-
-    return [];
-  }
-}
-
-
-/* --------------------------------
-   CHAT ID
--------------------------------- */
-
-function createChatId(uid1, uid2) {
-
-  return [uid1, uid2]
-    .sort()
-    .join("_");
-
-}
-
-
-/* --------------------------------
-   CHAT APP
--------------------------------- */
-
 function ChatApp({ user }) {
+
+  const [message, setMessage] = useState("");
+
+  const [search, setSearch] = useState("");
+
+  const [searchResults, setSearchResults] = useState([]);
+
+  const [searching, setSearching] = useState(false);
+
+  const [searchError, setSearchError] = useState("");
+
+  const [activeChat, setActiveChat] = useState(null);
 
   const [contacts, setContacts] = useState([]);
 
-  const [activeChat, setActiveChat] =
-    useState(null);
 
-  const [message, setMessage] =
-    useState("");
-
-  const [searchText, setSearchText] =
-    useState("");
-
-  const [searchResults, setSearchResults] =
-    useState([]);
-
-  const [searching, setSearching] =
-    useState(false);
-
-
-  /* --------------------------------
-     SEARCH
-  -------------------------------- */
+  /*
+   * SEARCH USERS BY EMAIL
+   */
 
   useEffect(() => {
 
-    const timer = setTimeout(async () => {
+    const searchPeople = async () => {
 
-      if (!searchText.trim()) {
+      const email = search.trim().toLowerCase();
 
-        setSearchResults([]);
+      setSearchError("");
+      setSearchResults([]);
+
+      if (!email) {
         return;
+      }
+
+      /*
+       * Don't search yourself
+       */
+
+      if (email === user.email?.toLowerCase()) {
+
+        setSearchError(
+          "You cannot add yourself."
+        );
+
+        return;
+      }
+
+
+      try {
+
+        setSearching(true);
+
+
+        const q = query(
+          collection(db, "users"),
+          where("email", "==", email)
+        );
+
+
+        const snapshot =
+          await getDocs(q);
+
+
+        const users =
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data()
+          }));
+
+
+        setSearchResults(users);
+
+
+        if (users.length === 0) {
+
+          setSearchError(
+            "No users found."
+          );
+
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          "Search error:",
+          error
+        );
+
+        setSearchError(
+          "Search failed. Please try again."
+        );
+
+      } finally {
+
+        setSearching(false);
 
       }
 
-      setSearching(true);
-
-      const results =
-        await searchUsers(
-          searchText,
-          user.uid
-        );
-
-      setSearchResults(results);
-
-      setSearching(false);
-
-    }, 400);
-
-    return () => clearTimeout(timer);
-
-  }, [searchText, user.uid]);
+    };
 
 
-  /* --------------------------------
-     ADD CONTACT
-  -------------------------------- */
-
-  const addContact = (contact) => {
-
-    const alreadyExists =
-      contacts.some(
-        (item) =>
-          item.uid === contact.uid
+    const timer =
+      setTimeout(
+        searchPeople,
+        400
       );
 
-    if (!alreadyExists) {
 
-      setContacts((previous) => [
-        ...previous,
-        contact
-      ]);
+    return () =>
+      clearTimeout(timer);
+
+  }, [search, user]);
+
+
+  /*
+   * ADD CONTACT
+   */
+
+  const addContact = async (person) => {
+
+    try {
+
+      await addDoc(
+        collection(
+          db,
+          "users",
+          user.uid,
+          "contacts"
+        ),
+        {
+          uid: person.uid,
+          name: person.name,
+          email: person.email,
+          photoURL:
+            person.photoURL || "",
+          addedAt:
+            serverTimestamp()
+        }
+      );
+
+
+      setContacts((prev) => {
+
+        const exists =
+          prev.some(
+            (item) =>
+              item.uid === person.uid
+          );
+
+        if (exists) {
+          return prev;
+        }
+
+        return [
+          ...prev,
+          person
+        ];
+
+      });
+
+
+      setSearch("");
+      setSearchResults([]);
+
+    } catch (error) {
+
+      console.error(
+        "Add contact error:",
+        error
+      );
+
+      setSearchError(
+        "Could not add contact."
+      );
 
     }
-
-    setActiveChat(contact);
-
-    setSearchText("");
-
-    setSearchResults([]);
 
   };
 
 
-  /* --------------------------------
-     SEND MESSAGE
-  -------------------------------- */
+  /*
+   * SEND MESSAGE
+   */
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
 
-    if (!message.trim()) return;
+    if (!message.trim()) {
+      return;
+    }
 
-    if (!activeChat) return;
-
-    const chatId = createChatId(
-      user.uid,
-      activeChat.uid
-    );
+    if (!activeChat) {
+      return;
+    }
 
     console.log(
-      "Sending message to:",
-      chatId
+      "Send message:",
+      message,
+      "to:",
+      activeChat
     );
 
     setMessage("");
@@ -213,11 +250,11 @@ function ChatApp({ user }) {
 
     <div className="app">
 
-      {/* =========================
-          SIDEBAR
-      ========================= */}
+
+      {/* SIDEBAR */}
 
       <aside className="sidebar">
+
 
         {/* BRAND */}
 
@@ -250,28 +287,19 @@ function ChatApp({ user }) {
           <Search size={18} />
 
           <input
-            type="text"
-            placeholder="Search people..."
-            value={searchText}
+            type="email"
+            placeholder="Search by email..."
+            value={search}
             onChange={(e) =>
-              setSearchText(
-                e.target.value
-              )
+              setSearch(e.target.value)
             }
           />
 
-          {searchText && (
-
-            <button
-              className="search-clear"
-              onClick={() => {
-                setSearchText("");
-                setSearchResults([]);
-              }}
-            >
-              <X size={16} />
-            </button>
-
+          {searching && (
+            <Loader2
+              size={16}
+              className="spin"
+            />
           )}
 
         </div>
@@ -279,79 +307,72 @@ function ChatApp({ user }) {
 
         {/* SEARCH RESULTS */}
 
-        {searchText && (
+        {search.trim() && (
 
           <div className="search-results">
 
-            {searching && (
-              <div className="search-message">
-                Searching...
+            {searchError && !searching && (
+
+              <div className="search-empty">
+                {searchError}
               </div>
+
             )}
 
-            {!searching &&
-              searchResults.length === 0 && (
 
-                <div className="search-message">
-                  No users found
+            {searchResults.map((person) => (
+
+              <div
+                className="user-result"
+                key={person.uid}
+              >
+
+                <div className="avatar">
+
+                  {person.name
+                    ?.charAt(0)
+                    ?.toUpperCase() || "U"}
+
                 </div>
 
-              )}
+
+                <div className="user-result-info">
+
+                  <strong>
+                    {person.name}
+                  </strong>
+
+                  <span>
+                    {person.email}
+                  </span>
+
+                </div>
 
 
-            {searchResults.map(
-              (person) => (
-
-                <div
-                  className="search-user"
-                  key={person.id}
+                <button
+                  className="add-contact-btn"
+                  onClick={() =>
+                    addContact(person)
+                  }
+                  title="Add contact"
                 >
 
-                  <div className="avatar">
+                  <UserPlus
+                    size={18}
+                  />
 
-                    {person.name
-                      ?.charAt(0)
-                      ?.toUpperCase() ||
-                      "U"}
+                </button>
 
-                  </div>
+              </div>
 
-
-                  <div className="search-user-info">
-
-                    <strong>
-                      {person.name}
-                    </strong>
-
-                    <span>
-                      {person.email}
-                    </span>
-
-                  </div>
-
-
-                  <button
-                    className="add-user-btn"
-                    onClick={() =>
-                      addContact(person)
-                    }
-                  >
-
-                    <UserPlus size={17} />
-
-                  </button>
-
-                </div>
-
-              )
-            )}
+            ))}
 
           </div>
 
         )}
 
 
-        {/* CONTACT TITLE */}
+        {/* CONTACTS */}
 
         <div className="section-title">
 
@@ -359,17 +380,7 @@ function ChatApp({ user }) {
             Contacts
           </span>
 
-          <button
-            className="icon-btn"
-            onClick={() => {
-              setSearchText("");
-              document
-                .querySelector(
-                  ".search-box input"
-                )
-                ?.focus();
-            }}
-          >
+          <button className="icon-btn">
 
             <Plus size={18} />
 
@@ -378,15 +389,13 @@ function ChatApp({ user }) {
         </div>
 
 
-        {/* CONTACT LIST */}
-
         <div className="chat-list">
 
           {contacts.length === 0 ? (
 
             <div className="empty-contacts">
 
-              <Users size={30} />
+              <Users size={25} />
 
               <p>
                 No contacts yet
@@ -419,10 +428,7 @@ function ChatApp({ user }) {
 
                   {contact.name
                     ?.charAt(0)
-                    ?.toUpperCase() ||
-                    "U"}
-
-                  <span className="online-dot" />
+                    ?.toUpperCase() || "U"}
 
                 </div>
 
@@ -437,10 +443,11 @@ function ChatApp({ user }) {
 
                   </div>
 
+
                   <div className="chat-bottom">
 
                     <p>
-                      Start a conversation
+                      {contact.email}
                     </p>
 
                   </div>
@@ -456,24 +463,42 @@ function ChatApp({ user }) {
         </div>
 
 
-        {/* BOTTOM NAV */}
+        {/* SIDEBAR BOTTOM */}
 
         <div className="sidebar-bottom">
 
           <button>
+
             <MessageCircle size={20} />
-            <span>Chats</span>
+
+            <span>
+              Chats
+            </span>
+
           </button>
 
+
           <button>
+
             <Users size={20} />
-            <span>Groups</span>
+
+            <span>
+              Groups
+            </span>
+
           </button>
 
+
           <button>
+
             <Settings size={20} />
-            <span>Settings</span>
+
+            <span>
+              Settings
+            </span>
+
           </button>
+
 
           <button
             onClick={() =>
@@ -494,11 +519,10 @@ function ChatApp({ user }) {
       </aside>
 
 
-      {/* =========================
-          CHAT AREA
-      ========================= */}
+      {/* CHAT */}
 
       <main className="chat">
+
 
         {!activeChat ? (
 
@@ -513,8 +537,8 @@ function ChatApp({ user }) {
             </h2>
 
             <p>
-              Search for a user and
-              start a conversation.
+              Search for someone by email
+              and add them to your contacts.
             </p>
 
           </div>
@@ -533,12 +557,10 @@ function ChatApp({ user }) {
 
                   {activeChat.name
                     ?.charAt(0)
-                    ?.toUpperCase() ||
-                    "U"}
-
-                  <span className="online-dot" />
+                    ?.toUpperCase() || "U"}
 
                 </div>
+
 
                 <div>
 
@@ -547,7 +569,7 @@ function ChatApp({ user }) {
                   </h2>
 
                   <span>
-                    Online
+                    {activeChat.email}
                   </span>
 
                 </div>
@@ -589,20 +611,15 @@ function ChatApp({ user }) {
               </div>
 
 
-              <div className="empty-messages">
-
-                <MessageCircle
-                  size={38}
-                />
-
-                <h3>
-                  Start chatting
-                </h3>
+              <div className="message received">
 
                 <p>
-                  Send a message to{" "}
-                  {activeChat.name}
+                  Start a conversation 👋
                 </p>
+
+                <span>
+                  Now
+                </span>
 
               </div>
 
@@ -634,9 +651,7 @@ function ChatApp({ user }) {
               <input
                 value={message}
                 onChange={(e) =>
-                  setMessage(
-                    e.target.value
-                  )
+                  setMessage(e.target.value)
                 }
                 onKeyDown={(e) => {
 
@@ -691,9 +706,9 @@ function ChatApp({ user }) {
 }
 
 
-/* --------------------------------
-   MAIN APP
--------------------------------- */
+/*
+ * MAIN APP
+ */
 
 function App() {
 
@@ -715,10 +730,12 @@ function App() {
         (currentUser) => {
 
           setUser(currentUser);
+
           setLoading(false);
 
         }
       );
+
 
     return unsubscribe;
 
