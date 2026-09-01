@@ -8,26 +8,23 @@ import {
 
 import { db } from "../firebase";
 
-export async function searchUsers(searchText) {
-  const text = searchText.trim().toLowerCase();
+export async function searchUsers(email) {
+  const cleanEmail = email.trim().toLowerCase();
 
-  if (!text) {
+  if (!cleanEmail) {
     return [];
   }
 
-  const usersRef = collection(db, "users");
-
-  const usersQuery = query(
-    usersRef,
-    where("nameLower", ">=", text),
-    where("nameLower", "<=", text + "\uf8ff"),
-    limit(20)
+  const q = query(
+    collection(db, "users"),
+    where("email", "==", cleanEmail),
+    limit(10)
   );
 
-  const snapshot = await getDocs(usersQuery);
+  const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data()
+  return snapshot.docs.map((item) => ({
+    id: item.id,
+    ...item.data()
   }));
 }
