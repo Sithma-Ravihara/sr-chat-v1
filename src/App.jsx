@@ -7,6 +7,9 @@ import {
 
 import {
   collection,
+  query,
+  where,
+  getDocs,
   addDoc,
   onSnapshot,
   serverTimestamp
@@ -24,43 +27,19 @@ import Register from "./pages/Register";
 
 import {
   Search,
-  MessageCircle,
-  Users,
-  Settings,
   Plus,
   Send,
-  Paperclip,
-  Mic,
-  MoreVertical,
-  Phone,
-  Video,
-  Smile,
-  CheckCheck,
   LogOut,
-  UserPlus,
+  Users,
+  MessageCircle,
+  Settings,
   Loader2
 } from "lucide-react";
 
 
-/* =========================================
-   CHAT APP
-========================================= */
-
 function ChatApp({ user }) {
 
-  const [search, setSearch] = useState("");
-
-  const [searchResults, setSearchResults] =
-    useState([]);
-
-  const [searching, setSearching] =
-    useState(false);
-
-  const [searchError, setSearchError] =
-    useState("");
-
-  const [contacts, setContacts] =
-    useState([]);
+  const [contacts, setContacts] = useState([]);
 
   const [activeChat, setActiveChat] =
     useState(null);
@@ -71,218 +50,143 @@ function ChatApp({ user }) {
   const [message, setMessage] =
     useState("");
 
-  const [sending, setSending] =
+  const [showNewChat, setShowNewChat] =
     useState(false);
 
+  const [srId, setSrId] =
+    useState("");
 
-  /* =========================================
-     SEARCH USERS
-  ========================================= */
+  const [searching, setSearching] =
+    useState(false);
 
-  useEffect(() => {
+  const [searchResult, setSearchResult] =
+    useState(null);
 
-    const timer = setTimeout(async () => {
-
-      const value =
-        search.trim().toLowerCase();
-
-      setSearchError("");
-      setSearchResults([]);
-
-      if (!value) {
-        return;
-      }
-
-      if (
-        value ===
-        user.email?.toLowerCase()
-      ) {
-
-        setSearchError(
-          "You cannot add yourself."
-        );
-
-        return;
-      }
-
-      try {
-
-        setSearching(true);
-
-        const { searchUsers } =
-          await import(
-            "./services/users"
-          );
-
-        const results =
-          await searchUsers(value);
-
-        setSearchResults(results);
-
-        if (results.length === 0) {
-
-          setSearchError(
-            "No users found."
-          );
-
-        }
-
-      } catch (error) {
-
-        console.error(
-          "Search error:",
-          error
-        );
-
-        setSearchError(
-          "Search failed."
-        );
-
-      } finally {
-
-        setSearching(false);
-
-      }
-
-    }, 400);
+  const [searchError, setSearchError] =
+    useState("");
 
 
-    return () =>
-      clearTimeout(timer);
-
-  }, [search, user]);
-
-
-  /* =========================================
+  /* ===============================
      LOAD CONTACTS
-  ========================================= */
+  =============================== */
 
   useEffect(() => {
 
-    if (!user?.uid) {
-      return;
-    }
-
-    const contactsRef =
-      collection(
-        db,
-        "users",
-        user.uid,
-        "contacts"
-      );
-
-
-    const unsubscribe =
-      onSnapshot(
-        contactsRef,
-        (snapshot) => {
-
-          const list =
-            snapshot.docs.map(
-              (item) => ({
-                id: item.id,
-                ...item.data()
-              })
-            );
-
-          setContacts(list);
-
-        },
-        (error) => {
-
-          console.error(
-            "Contacts error:",
-            error
-          );
-
-        }
-      );
-
-
-    return unsubscribe;
-
-  }, [user]);
-
-
-  /* =========================================
-     REALTIME MESSAGE LISTENER
-  ========================================= */
-
-  useEffect(() => {
-
-    setMessages([]);
-
-    if (!activeChat?.uid) {
-      return;
-    }
-
-
-    /*
-     * IMPORTANT:
-     * Both users get the same chat ID.
-     */
-
-    const chatId = [
+    const ref = collection(
+      db,
+      "users",
       user.uid,
-      activeChat.uid
-    ]
-      .sort()
-      .join("_");
-
-
-    console.log(
-      "Listening to chat:",
-      chatId
+      "contacts"
     );
 
+    return onSnapshot(
+      ref,
+      (snapshot) => {
 
-    const unsubscribe =
-      listenToMessages(
-        chatId,
-        (newMessages) => {
+        setContacts(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+        );
 
-          setMessages(
-            newMessages
-          );
+      }
+    );
 
-        }
-      );
-
-
-    return unsubscribe;
-
-  }, [activeChat, user]);
+  }, [user.uid]);
 
 
-  /* =========================================
-     ADD CONTACT
-  ========================================= */
+  /* ===============================
+     SEARCH SR ID
+  =============================== */
 
-  const addContact = async (person) => {
+  const searchUser = async () => {
 
-    if (!person?.uid) {
-      return;
-    }
+    const value =
+      srId.trim().toUpperCase();
 
+    if (!value) return;
+
+    setSearching(true);
+    setSearchError("");
+    setSearchResult(null);
 
     try {
 
-      const exists =
-        contacts.some(
-          (contact) =>
-            contact.uid === person.uid
-        );
+      const usersRef =
+        collection(db, "users");
 
+      const q = query(
+        usersRef,
+        where("srId", "==", value)
+      );
 
-      if (exists) {
+      const snapshot =
+        await getDocs(q);
+
+      if (snapshot.empty) {
 
         setSearchError(
-          "Already in your contacts."
+          "No user found."
         );
 
-        return;
+      } else {
+
+        const doc =
+          snapshot.docs[0];
+
+        const data =
+          doc.data();
+
+        if (data.uid === user.uid) {
+
+          setSearchError(
+            "You cannot chat with yourself."
+          );
+
+        } else {
+
+          setSearchResult({
+            id: doc.id,
+            ...data
+          });
+
+        }
+
       }
 
+    } catch (error) {
+
+      console.error(error);
+
+      setSearchError(
+        "Search failed."
+      );
+
+    } finally {
+
+      setSearching(false);
+
+    }
+
+  };
+
+
+  /* ===============================
+     ADD CONTACT
+  =============================== */
+
+  const addContact = async () => {
+
+    if (!searchResult) return;
+
+    const exists =
+      contacts.some(
+        (c) =>
+          c.uid === searchResult.uid
+      );
+
+    if (!exists) {
 
       await addDoc(
         collection(
@@ -292,73 +196,77 @@ function ChatApp({ user }) {
           "contacts"
         ),
         {
-          uid: person.uid,
-          name: person.name || "",
-          email: person.email || "",
+          uid: searchResult.uid,
+          name: searchResult.name,
+          email: searchResult.email,
+          srId: searchResult.srId,
           photoURL:
-            person.photoURL || "",
+            searchResult.photoURL || "",
           addedAt:
             serverTimestamp()
         }
       );
 
-
-      setSearch("");
-      setSearchResults([]);
-      setSearchError("");
-
-
-    } catch (error) {
-
-      console.error(
-        "Add contact error:",
-        error
-      );
-
-      setSearchError(
-        "Could not add contact."
-      );
-
     }
+
+    setActiveChat(searchResult);
+
+    setShowNewChat(false);
+    setSrId("");
+    setSearchResult(null);
 
   };
 
 
-  /* =========================================
-     SEND MESSAGE
-  ========================================= */
+  /* ===============================
+     REALTIME MESSAGES
+  =============================== */
 
-  const handleSendMessage = async () => {
-
-    if (!message.trim()) {
-      return;
-    }
+  useEffect(() => {
 
     if (!activeChat?.uid) {
+
+      setMessages([]);
+
       return;
+
     }
 
-    if (sending) {
-      return;
-    }
+
+    const chatId =
+      [user.uid, activeChat.uid]
+        .sort()
+        .join("_");
 
 
-    /*
-     * SAME CHAT ID FOR BOTH USERS
-     */
+    return listenToMessages(
+      chatId,
+      (data) => {
+        setMessages(data);
+      }
+    );
 
-    const chatId = [
-      user.uid,
-      activeChat.uid
-    ]
-      .sort()
-      .join("_");
+  }, [activeChat, user.uid]);
+
+
+  /* ===============================
+     SEND MESSAGE
+  =============================== */
+
+  const send = async () => {
+
+    if (!message.trim()) return;
+
+    if (!activeChat?.uid) return;
+
+
+    const chatId =
+      [user.uid, activeChat.uid]
+        .sort()
+        .join("_");
 
 
     try {
-
-      setSending(true);
-
 
       await sendChatMessage(
         chatId,
@@ -366,54 +274,31 @@ function ChatApp({ user }) {
         message
       );
 
-
       setMessage("");
-
 
     } catch (error) {
 
-      console.error(
-        "Send message error:",
-        error
+      console.error(error);
+
+      alert(
+        "Message send failed."
       );
-
-    } finally {
-
-      setSending(false);
 
     }
 
   };
 
 
-  /* =========================================
-     LOGOUT
-  ========================================= */
-
-  const logout = async () => {
-
-    await signOut(auth);
-
-  };
-
-
-  /* =========================================
-     UI
-  ========================================= */
-
   return (
 
     <div className="app">
 
 
-      {/* =====================================
+      {/* =========================
           SIDEBAR
-      ====================================== */}
+      ========================== */}
 
       <aside className="sidebar">
-
-
-        {/* BRAND */}
 
         <div className="brand">
 
@@ -437,107 +322,23 @@ function ChatApp({ user }) {
         </div>
 
 
-        {/* SEARCH */}
+        {/* NEW CHAT */}
 
-        <div className="search-box">
+        <button
+          className="new-chat-btn"
+          onClick={() =>
+            setShowNewChat(true)
+          }
+        >
 
-          <Search size={18} />
+          <Plus size={18} />
 
-          <input
-            type="email"
-            placeholder="Search by email..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-          />
+          New Chat
 
-          {searching && (
-
-            <Loader2
-              size={17}
-              className="spin"
-            />
-
-          )}
-
-        </div>
+        </button>
 
 
-        {/* SEARCH RESULTS */}
-
-        {search.trim() && (
-
-          <div className="search-results">
-
-            {searchError &&
-              !searching && (
-
-                <div className="search-empty">
-
-                  {searchError}
-
-                </div>
-
-              )}
-
-
-            {searchResults.map(
-              (person) => (
-
-                <div
-                  className="user-result"
-                  key={person.uid}
-                >
-
-                  <div className="avatar">
-
-                    {person.name
-                      ?.charAt(0)
-                      ?.toUpperCase() ||
-                      "U"}
-
-                  </div>
-
-
-                  <div className="user-result-info">
-
-                    <strong>
-                      {person.name ||
-                        "User"}
-                    </strong>
-
-                    <span>
-                      {person.email}
-                    </span>
-
-                  </div>
-
-
-                  <button
-                    className="add-contact-btn"
-                    onClick={() =>
-                      addContact(person)
-                    }
-                  >
-
-                    <UserPlus
-                      size={18}
-                    />
-
-                  </button>
-
-                </div>
-
-              )
-            )}
-
-          </div>
-
-        )}
-
-
-        {/* CONTACT TITLE */}
+        {/* CONTACTS */}
 
         <div className="section-title">
 
@@ -545,32 +346,23 @@ function ChatApp({ user }) {
             Contacts
           </span>
 
-          <button className="icon-btn">
-
-            <Plus size={18} />
-
-          </button>
-
         </div>
 
 
-        {/* CONTACTS */}
-
         <div className="chat-list">
-
 
           {contacts.length === 0 ? (
 
             <div className="empty-contacts">
 
-              <Users size={25} />
+              <Users size={24} />
 
               <p>
                 No contacts yet
               </p>
 
               <span>
-                Search for people above
+                Press New Chat
               </span>
 
             </div>
@@ -607,22 +399,13 @@ function ChatApp({ user }) {
 
                   <div className="chat-info">
 
-                    <div className="chat-top">
+                    <strong>
+                      {contact.name}
+                    </strong>
 
-                      <strong>
-                        {contact.name}
-                      </strong>
-
-                    </div>
-
-
-                    <div className="chat-bottom">
-
-                      <p>
-                        {contact.email}
-                      </p>
-
-                    </div>
+                    <span>
+                      {contact.srId}
+                    </span>
 
                   </div>
 
@@ -636,49 +419,37 @@ function ChatApp({ user }) {
         </div>
 
 
-        {/* BOTTOM MENU */}
+        {/* BOTTOM */}
 
         <div className="sidebar-bottom">
 
           <button>
-
             <MessageCircle
               size={20}
             />
-
             <span>
               Chats
             </span>
-
           </button>
 
-
           <button>
-
             <Users size={20} />
-
             <span>
               Groups
             </span>
-
           </button>
 
-
           <button>
-
-            <Settings
-              size={20}
-            />
-
+            <Settings size={20} />
             <span>
               Settings
             </span>
-
           </button>
 
-
           <button
-            onClick={logout}
+            onClick={() =>
+              signOut(auth)
+            }
           >
 
             <LogOut size={20} />
@@ -691,16 +462,14 @@ function ChatApp({ user }) {
 
         </div>
 
-
       </aside>
 
 
-      {/* =====================================
-          CHAT AREA
-      ====================================== */}
+      {/* =========================
+          CHAT
+      ========================== */}
 
       <main className="chat">
-
 
         {!activeChat ? (
 
@@ -715,8 +484,8 @@ function ChatApp({ user }) {
             </h2>
 
             <p>
-              Search for a user and add
-              them to your contacts.
+              Start a new chat using
+              an SR ID.
             </p>
 
           </div>
@@ -724,9 +493,6 @@ function ChatApp({ user }) {
         ) : (
 
           <>
-
-
-            {/* CHAT HEADER */}
 
             <header className="chat-header">
 
@@ -741,7 +507,6 @@ function ChatApp({ user }) {
 
                 </div>
 
-
                 <div>
 
                   <h2>
@@ -749,56 +514,17 @@ function ChatApp({ user }) {
                   </h2>
 
                   <span>
-                    {activeChat.email}
+                    {activeChat.srId}
                   </span>
 
                 </div>
 
               </div>
 
-
-              <div className="header-actions">
-
-                <button className="icon-btn">
-
-                  <Phone size={19} />
-
-                </button>
-
-
-                <button className="icon-btn">
-
-                  <Video size={19} />
-
-                </button>
-
-
-                <button className="icon-btn">
-
-                  <MoreVertical
-                    size={20}
-                  />
-
-                </button>
-
-              </div>
-
             </header>
 
 
-            {/* MESSAGES */}
-
             <section className="messages">
-
-
-              <div className="date-divider">
-
-                <span>
-                  Today
-                </span>
-
-              </div>
-
 
               {messages.length === 0 ? (
 
@@ -809,8 +535,7 @@ function ChatApp({ user }) {
                   </p>
 
                   <span>
-                    Send a message to start
-                    the conversation.
+                    Say hello 👋
                   </span>
 
                 </div>
@@ -818,60 +543,34 @@ function ChatApp({ user }) {
               ) : (
 
                 messages.map(
-                  (item) => {
+                  (msg) => {
 
-                    const isMine =
-                      item.senderId ===
+                    const mine =
+                      msg.senderId ===
                       user.uid;
-
 
                     return (
 
                       <div
-                        key={item.id}
+                        key={msg.id}
                         className={`message ${
-                          isMine
+                          mine
                             ? "sent"
                             : "received"
                         }`}
                       >
 
                         <p>
-                          {item.text}
+                          {msg.text}
                         </p>
 
-
-                        <div className="message-meta">
-
-                          <span>
-
-                            {item.createdAt
-                              ?.toDate
-                              ? item.createdAt
-                                  .toDate()
-                                  .toLocaleTimeString(
-                                    [],
-                                    {
-                                      hour:
-                                        "2-digit",
-                                      minute:
-                                        "2-digit"
-                                    }
-                                  )
-                              : "Now"}
-
-                          </span>
-
-
-                          {isMine && (
-
-                            <CheckCheck
-                              size={15}
-                            />
-
-                          )}
-
-                        </div>
+                        {mine && (
+                          <div className="message-meta">
+                            <span>
+                              ✓✓
+                            </span>
+                          </div>
+                        )}
 
                       </div>
 
@@ -885,32 +584,7 @@ function ChatApp({ user }) {
             </section>
 
 
-            {/* MESSAGE INPUT */}
-
             <div className="message-area">
-
-
-              <button
-                className="icon-btn"
-              >
-
-                <Paperclip
-                  size={21}
-                />
-
-              </button>
-
-
-              <button
-                className="icon-btn"
-              >
-
-                <Smile
-                  size={21}
-                />
-
-              </button>
-
 
               <input
                 value={message}
@@ -925,38 +599,131 @@ function ChatApp({ user }) {
                     e.key ===
                     "Enter"
                   ) {
-
-                    handleSendMessage();
-
+                    send();
                   }
 
                 }}
                 placeholder="Write a message..."
-                disabled={sending}
               />
 
 
-              {message.trim() ? (
+              <button
+                className="send-btn"
+                onClick={send}
+              >
+
+                <Send size={20} />
+
+              </button>
+
+            </div>
+
+          </>
+
+        )}
+
+      </main>
+
+
+      {/* =========================
+          NEW CHAT MODAL
+      ========================== */}
+
+      {showNewChat && (
+
+        <div className="modal-overlay">
+
+          <div className="modal">
+
+            <h2>
+              New Chat
+            </h2>
+
+            <p>
+              Enter the person's SR ID.
+            </p>
+
+
+            <div className="auth-input">
+
+              <Search size={18} />
+
+              <input
+                value={srId}
+                onChange={(e) =>
+                  setSrId(
+                    e.target.value
+                  )
+                }
+                placeholder="SR-XXXXXX"
+              />
+
+            </div>
+
+
+            {searchError && (
+
+              <div className="auth-error">
+
+                {searchError}
+
+              </div>
+
+            )}
+
+
+            {searchResult && (
+
+              <div className="user-result">
+
+                <div className="avatar">
+
+                  {searchResult.name
+                    ?.charAt(0)
+                    ?.toUpperCase()}
+
+                </div>
+
+                <div className="user-result-info">
+
+                  <strong>
+                    {searchResult.name}
+                  </strong>
+
+                  <span>
+                    {searchResult.srId}
+                  </span>
+
+                </div>
+
+              </div>
+
+            )}
+
+
+            <div className="modal-actions">
+
+              {!searchResult ? (
 
                 <button
-                  className="send-btn"
-                  onClick={
-                    handleSendMessage
-                  }
-                  disabled={sending}
+                  className="auth-submit"
+                  onClick={searchUser}
+                  disabled={searching}
                 >
 
-                  {sending ? (
-
-                    <Loader2
-                      size={20}
-                      className="spin"
-                    />
-
+                  {searching ? (
+                    <>
+                      <Loader2
+                        size={18}
+                        className="spin"
+                      />
+                      Searching...
+                    </>
                   ) : (
-
-                    <Send size={20} />
-
+                    <>
+                      <Search size={18} />
+                      Find User
+                    </>
                   )}
 
                 </button>
@@ -964,24 +731,44 @@ function ChatApp({ user }) {
               ) : (
 
                 <button
-                  className="send-btn"
+                  className="auth-submit"
+                  onClick={addContact}
                 >
 
-                  <Mic size={20} />
+                  <MessageCircle
+                    size={18}
+                  />
+
+                  Start Chat
 
                 </button>
 
               )}
 
 
+              <button
+                className="icon-btn"
+                onClick={() => {
+
+                  setShowNewChat(false);
+                  setSrId("");
+                  setSearchResult(null);
+                  setSearchError("");
+
+                }}
+              >
+
+                Cancel
+
+              </button>
+
             </div>
 
+          </div>
 
-          </>
+        </div>
 
-        )}
-
-      </main>
+      )}
 
     </div>
 
@@ -990,9 +777,9 @@ function ChatApp({ user }) {
 }
 
 
-/* =========================================
+/* ===============================
    ROOT APP
-========================================= */
+================================ */
 
 function App() {
 
@@ -1008,32 +795,22 @@ function App() {
 
   useEffect(() => {
 
-    const unsubscribe =
-      onAuthStateChanged(
-        auth,
-        (currentUser) => {
+    return onAuthStateChanged(
+      auth,
+      (currentUser) => {
 
-          setUser(
-            currentUser
-          );
+        setUser(currentUser);
+        setLoading(false);
 
-          setLoading(false);
-
-        }
-      );
-
-
-    return unsubscribe;
+      }
+    );
 
   }, []);
 
 
-  /* LOADING */
-
   if (loading) {
 
     return (
-
       <div className="loading-screen">
 
         <div className="loading-logo">
@@ -1045,43 +822,31 @@ function App() {
         </p>
 
       </div>
-
     );
 
   }
 
-
-  /* AUTH */
 
   if (!user) {
 
     if (showRegister) {
 
       return (
-
         <Register
           onLogin={() =>
-            setShowRegister(
-              false
-            )
+            setShowRegister(false)
           }
         />
-
       );
 
     }
 
-
     return (
-
       <Login
         onRegister={() =>
-          setShowRegister(
-            true
-          )
+          setShowRegister(true)
         }
       />
-
     );
 
   }
