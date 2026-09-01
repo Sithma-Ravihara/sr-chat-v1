@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   createUserWithEmailAndPassword,
   updateProfile
@@ -38,13 +39,18 @@ function Register({ onLogin }) {
     setError("");
 
 
-    const cleanName = name.trim();
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanName =
+      name.trim();
+
+    const cleanEmail =
+      email.trim().toLowerCase();
 
 
     if (!cleanName) {
 
-      setError("Please enter your name.");
+      setError(
+        "Please enter your name."
+      );
 
       return;
     }
@@ -52,7 +58,9 @@ function Register({ onLogin }) {
 
     if (!cleanEmail) {
 
-      setError("Please enter your email.");
+      setError(
+        "Please enter your email."
+      );
 
       return;
     }
@@ -74,7 +82,7 @@ function Register({ onLogin }) {
 
 
       /*
-       * 1. CREATE FIREBASE AUTH ACCOUNT
+       * 1. Create Firebase Authentication user
        */
 
       const result =
@@ -86,7 +94,7 @@ function Register({ onLogin }) {
 
 
       /*
-       * 2. SET DISPLAY NAME
+       * 2. Set Firebase display name
        */
 
       await updateProfile(
@@ -98,7 +106,7 @@ function Register({ onLogin }) {
 
 
       /*
-       * 3. CREATE FIRESTORE USER
+       * 3. Create Firestore user document
        */
 
       await setDoc(
@@ -128,15 +136,20 @@ function Register({ onLogin }) {
 
 
       console.log(
-        "User created successfully:",
+        "USER DOCUMENT CREATED:",
         result.user.uid
       );
 
 
+      /*
+       * Authentication state automatically
+       * takes the user to ChatApp.
+       */
+
     } catch (err) {
 
       console.error(
-        "Registration error:",
+        "REGISTER ERROR:",
         err
       );
 
@@ -165,7 +178,7 @@ function Register({ onLogin }) {
       ) {
 
         setError(
-          "Password must contain at least 6 characters."
+          "Password is too weak."
         );
 
       } else if (
@@ -174,25 +187,14 @@ function Register({ onLogin }) {
       ) {
 
         setError(
-          "Firestore permission denied. Check Firestore Rules."
-        );
-
-      } else if (
-        err.message &&
-        err.message
-          .toLowerCase()
-          .includes("offline")
-      ) {
-
-        setError(
-          "Firebase is offline. Please check your internet connection."
+          "Firestore permission denied."
         );
 
       } else {
 
         setError(
           err.message ||
-          "Registration failed. Please try again."
+          "Registration failed."
         );
 
       }
@@ -213,14 +215,10 @@ function Register({ onLogin }) {
       <div className="auth-card">
 
 
-        {/* LOGO */}
-
         <div className="auth-logo">
           SR
         </div>
 
-
-        {/* HEADING */}
 
         <div className="auth-heading">
 
@@ -229,7 +227,7 @@ function Register({ onLogin }) {
           </h1>
 
           <p>
-            Join SRChat and start messaging.
+            Create your SRChat account.
           </p>
 
         </div>
@@ -252,7 +250,7 @@ function Register({ onLogin }) {
 
               <input
                 type="text"
-                placeholder="Sithma Ravihara"
+                placeholder="Your name"
                 value={name}
                 onChange={(e) =>
                   setName(e.target.value)
@@ -324,13 +322,15 @@ function Register({ onLogin }) {
           {error && (
 
             <div className="auth-error">
+
               {error}
+
             </div>
 
           )}
 
 
-          {/* BUTTON */}
+          {/* SUBMIT */}
 
           <button
             className="auth-submit"
@@ -342,8 +342,8 @@ function Register({ onLogin }) {
 
               <>
                 <Loader2
-                  size={18}
                   className="spin"
+                  size={18}
                 />
 
                 Creating...
@@ -364,8 +364,6 @@ function Register({ onLogin }) {
 
         </form>
 
-
-        {/* LOGIN */}
 
         <p className="auth-switch">
 
