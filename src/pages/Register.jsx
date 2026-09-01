@@ -7,7 +7,6 @@ import {
 import {
   doc,
   setDoc,
-  getDoc,
   serverTimestamp
 } from "firebase/firestore";
 
@@ -37,11 +36,17 @@ function Register({ onLogin }) {
   const register = async (e) => {
 
     e.preventDefault();
+
     setError("");
 
     const cleanName = name.trim();
+
     const cleanUsername =
-      username.trim().toLowerCase().replace(/^@/, "");
+      username
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, "");
+
     const cleanEmail =
       email.trim().toLowerCase();
 
@@ -53,9 +58,11 @@ function Register({ onLogin }) {
 
 
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(cleanUsername)) {
+
       setError(
-        "Username must be 3-20 characters: letters, numbers or _"
+        "Username must be 3-20 characters using letters, numbers or _."
       );
+
       return;
     }
 
@@ -67,9 +74,11 @@ function Register({ onLogin }) {
 
 
     if (password.length < 6) {
+
       setError(
         "Password must contain at least 6 characters."
       );
+
       return;
     }
 
@@ -79,30 +88,9 @@ function Register({ onLogin }) {
       setLoading(true);
 
 
-      /* CHECK USERNAME */
-
-      const usernameRef = doc(
-        db,
-        "usernames",
-        cleanUsername
-      );
-
-      const usernameSnap =
-        await getDoc(usernameRef);
-
-
-      if (usernameSnap.exists()) {
-
-        setError(
-          "This username is already taken."
-        );
-
-        setLoading(false);
-        return;
-      }
-
-
-      /* CREATE AUTH ACCOUNT */
+      /*
+       * 1. CREATE FIREBASE AUTH ACCOUNT
+       */
 
       const result =
         await createUserWithEmailAndPassword(
@@ -112,7 +100,9 @@ function Register({ onLogin }) {
         );
 
 
-      /* UPDATE PROFILE */
+      /*
+       * 2. SET DISPLAY NAME
+       */
 
       await updateProfile(
         result.user,
@@ -122,7 +112,9 @@ function Register({ onLogin }) {
       );
 
 
-      /* CREATE USER PROFILE */
+      /*
+       * 3. CREATE FIRESTORE USER DOCUMENT
+       */
 
       await setDoc(
         doc(
@@ -132,39 +124,65 @@ function Register({ onLogin }) {
         ),
         {
           uid: result.user.uid,
+
           name: cleanName,
-          nameLower: cleanName.toLowerCase(),
 
-          username: cleanUsername,
-          usernameLower: cleanUsername,
+          nameLower:
+            cleanName.toLowerCase(),
 
-          email: cleanEmail,
+          username:
+            cleanUsername,
 
-          photoURL: "",
+          usernameLower:
+            cleanUsername,
 
-          status: "online",
+          email:
+            cleanEmail,
 
-          createdAt: serverTimestamp()
+          photoURL:
+            "",
+
+          status:
+            "online",
+
+          createdAt:
+            serverTimestamp()
         }
       );
 
 
-      /* RESERVE USERNAME */
+      /*
+       * 4. SAVE USERNAME
+       */
 
       await setDoc(
-        usernameRef,
+        doc(
+          db,
+          "usernames",
+          cleanUsername
+        ),
         {
-          uid: result.user.uid,
-          username: cleanUsername,
-          createdAt: serverTimestamp()
+          uid:
+            result.user.uid,
+
+          username:
+            cleanUsername,
+
+          createdAt:
+            serverTimestamp()
         }
+      );
+
+
+      console.log(
+        "SRChat account created successfully."
       );
 
 
     } catch (err) {
 
       console.error(
-        "Registration error:",
+        "SRChat registration error:",
         err
       );
 
@@ -205,11 +223,21 @@ function Register({ onLogin }) {
           "Firestore permission denied. Check Firestore Rules."
         );
 
+      } else if (
+        err.message
+          ?.toLowerCase()
+          .includes("offline")
+      ) {
+
+        setError(
+          "Cannot connect to Firebase. Please check your internet connection and try again."
+        );
+
       } else {
 
         setError(
           err.message ||
-          "Registration failed."
+          "Registration failed. Please try again."
         );
 
       }
@@ -269,6 +297,7 @@ function Register({ onLogin }) {
                 onChange={(e) =>
                   setName(e.target.value)
                 }
+                autoComplete="name"
               />
 
             </div>
@@ -293,10 +322,9 @@ function Register({ onLogin }) {
                 placeholder="sithma"
                 value={username}
                 onChange={(e) =>
-                  setUsername(
-                    e.target.value
-                  )
+                  setUsername(e.target.value)
                 }
+                autoComplete="username"
               />
 
             </div>
@@ -321,10 +349,9 @@ function Register({ onLogin }) {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) =>
-                  setEmail(
-                    e.target.value
-                  )
+                  setEmail(e.target.value)
                 }
+                autoComplete="email"
               />
 
             </div>
@@ -349,16 +376,17 @@ function Register({ onLogin }) {
                 placeholder="Minimum 6 characters"
                 value={password}
                 onChange={(e) =>
-                  setPassword(
-                    e.target.value
-                  )
+                  setPassword(e.target.value)
                 }
+                autoComplete="new-password"
               />
 
             </div>
 
           </label>
 
+
+          {/* ERROR */}
 
           {error && (
 
@@ -368,6 +396,8 @@ function Register({ onLogin }) {
 
           )}
 
+
+          {/* CREATE ACCOUNT */}
 
           <button
             className="auth-submit"
@@ -379,8 +409,8 @@ function Register({ onLogin }) {
 
               <>
                 <Loader2
-                  className="spin"
                   size={18}
+                  className="spin"
                 />
 
                 Creating...
@@ -414,6 +444,7 @@ function Register({ onLogin }) {
           </button>
 
         </p>
+
 
       </div>
 
