@@ -20,7 +20,9 @@ import {
   Loader2
 } from "lucide-react";
 
+
 function Register({ onLogin }) {
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,102 +30,145 @@ function Register({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+
   const register = async (e) => {
+
     e.preventDefault();
 
     setError("");
 
-    const cleanName = name.trim();
-    const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanName) {
+    if (!name.trim()) {
       setError("Please enter your name.");
       return;
     }
 
-    if (!cleanEmail) {
+
+    if (!email.trim()) {
       setError("Please enter your email.");
       return;
     }
 
+
     if (password.length < 6) {
-      setError("Password must contain at least 6 characters.");
+      setError(
+        "Password must contain at least 6 characters."
+      );
       return;
     }
 
+
     try {
+
       setLoading(true);
 
-      // Create Firebase Authentication account
+
+      /* CREATE FIREBASE AUTH USER */
+
       const result =
         await createUserWithEmailAndPassword(
           auth,
-          cleanEmail,
+          email.trim(),
           password
         );
 
-      // Update Firebase profile
-      await updateProfile(result.user, {
-        displayName: cleanName
-      });
 
-      // Create user document in Firestore
+      /* UPDATE DISPLAY NAME */
+
+      await updateProfile(
+        result.user,
+        {
+          displayName: name.trim()
+        }
+      );
+
+
+      /* CREATE FIRESTORE USER PROFILE */
+
       await setDoc(
-        doc(db, "users", result.user.uid),
+        doc(
+          db,
+          "users",
+          result.user.uid
+        ),
         {
           uid: result.user.uid,
 
-          name: cleanName,
+          name: name.trim(),
 
-          // Used for searching users
-          nameLower: cleanName.toLowerCase(),
+          nameLower:
+            name.trim().toLowerCase(),
 
-          email: cleanEmail,
+          email:
+            email.trim().toLowerCase(),
 
           photoURL: "",
 
           status: "online",
 
-          createdAt: serverTimestamp()
+          createdAt:
+            serverTimestamp()
         }
       );
 
-      // Firebase Auth automatically keeps
-      // the user logged in after registration.
+
+      console.log(
+        "User profile created:",
+        result.user.uid
+      );
+
 
     } catch (err) {
 
-      console.error("Registration error:", err);
+      console.error(
+        "Registration error:",
+        err
+      );
 
-      if (err.code === "auth/email-already-in-use") {
+
+      if (
+        err.code ===
+        "auth/email-already-in-use"
+      ) {
 
         setError(
           "This email is already registered."
         );
 
-      } else if (err.code === "auth/invalid-email") {
+      } else if (
+        err.code ===
+        "auth/invalid-email"
+      ) {
 
         setError(
           "Please enter a valid email."
         );
 
-      } else if (err.code === "auth/weak-password") {
+      } else if (
+        err.code ===
+        "auth/weak-password"
+      ) {
 
         setError(
           "Password is too weak."
         );
 
-      } else if (err.code === "auth/network-request-failed") {
+      } else if (
+        err.code ===
+        "permission-denied"
+      ) {
 
         setError(
-          "Network error. Please check your internet connection."
+          "Firestore permission denied. Check Firestore Rules."
         );
 
       } else {
 
         setError(
-          "Registration failed. Please try again."
+          err.message ||
+          "Registration failed."
         );
+
       }
 
     } finally {
@@ -131,20 +176,20 @@ function Register({ onLogin }) {
       setLoading(false);
 
     }
+
   };
 
+
   return (
+
     <div className="auth-page">
 
       <div className="auth-card">
-
-        {/* LOGO */}
 
         <div className="auth-logo">
           SR
         </div>
 
-        {/* TITLE */}
 
         <div className="auth-heading">
 
@@ -158,9 +203,9 @@ function Register({ onLogin }) {
 
         </div>
 
-        {/* FORM */}
 
         <form onSubmit={register}>
+
 
           {/* NAME */}
 
@@ -188,6 +233,7 @@ function Register({ onLogin }) {
 
           </label>
 
+
           {/* EMAIL */}
 
           <label>
@@ -213,6 +259,7 @@ function Register({ onLogin }) {
             </div>
 
           </label>
+
 
           {/* PASSWORD */}
 
@@ -240,13 +287,17 @@ function Register({ onLogin }) {
 
           </label>
 
+
           {/* ERROR */}
 
           {error && (
+
             <div className="auth-error">
               {error}
             </div>
+
           )}
+
 
           {/* SUBMIT */}
 
@@ -279,9 +330,9 @@ function Register({ onLogin }) {
 
           </button>
 
+
         </form>
 
-        {/* LOGIN */}
 
         <p className="auth-switch">
 
@@ -296,10 +347,14 @@ function Register({ onLogin }) {
 
         </p>
 
+
       </div>
 
     </div>
+
   );
+
 }
+
 
 export default Register;
