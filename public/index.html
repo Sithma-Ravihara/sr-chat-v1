@@ -1,1 +1,63 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080b10">
+  <title>SR Chat | Live Messaging</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">SR</div>
+        <div>
+          <h1>SR Chat</h1>
+          <p>Connect in real time</p>
+        </div>
+      </div>
+      <div class="status"><span></span> LIVE</div>
+    </header><section class="room">
+  <div class="room-info">
+    <div class="room-icon">#</div>
+    <div>
+      <h2>Public Lounge</h2>
+      <p>Chat with everyone</p>
+    </div>
+  </div>
+  <div class="online">
+    <span class="online-dot"></span>
+    <strong id="onlineCount">0</strong>
+    <small>online</small>
+  </div>
+</section>
 
+<section id="joinScreen" class="join-screen">
+  <div class="welcome-icon">✦</div>
+  <h2>Welcome to SR Chat</h2>
+  <p>Choose a username to join the conversation.</p>
+  <form id="joinForm">
+    <input id="username" maxlength="20" placeholder="Your username" required autocomplete="nickname">
+    <button type="submit">Join Chat <span>→</span></button>
+  </form>
+</section>
+
+<section id="chatScreen" class="chat-screen" hidden>
+  <div class="chat-heading">
+    <span>MESSAGES</span>
+    <span class="secure-label">REAL-TIME</span>
+  </div>
+
+  <div id="messages" class="messages" aria-live="polite"></div>
+
+  <form id="messageForm" class="composer">
+    <input id="messageInput" maxlength="1000" placeholder="Write a message..." autocomplete="off" required>
+    <button id="sendButton" type="submit" aria-label="Send message">➤</button>
+  </form>
+  <p class="hint">Be kind. Respect everyone in the room.</p>
+</section>
+
+<footer>SR CHAT <span>•</span> BUILT FOR CONNECTION</footer>
+
+  </main>  <script src="/socket.io/socket.io.js"></script>  <script src="app.js"></script></body>
+</html>
